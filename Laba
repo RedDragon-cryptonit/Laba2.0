@@ -1,0 +1,301 @@
+using System;
+using System.Collections.Generic;
+
+// Класс, который хранит состояние калькулятора (Memento)
+class CalculatorMemento
+{
+    public double Value { get; private set; }
+    public string OperationLog { get; private set; } // Логи операций для отображения цепочки
+
+    public CalculatorMemento(double value, string operationLog)
+    {
+        Value = value;
+        OperationLog = operationLog;
+    }
+}
+
+// Основной класс калькулятора
+class Calculator
+{
+    private double currentValue;
+    private List<CalculatorMemento> history;
+    private int currentIndex;
+
+    public Calculator()
+    {
+        currentValue = 0;
+        history = new List<CalculatorMemento>();
+        currentIndex = -1;
+        SaveState(); // сразу сохраняем начальное состояние
+    }
+
+    // Сохраняем текущее состояние в историю
+    private void SaveState()
+    {
+        // Если мы уже ходили назад по истории и делаем новое вычисление,
+        // то всё, что было после текущего индекса, нужно удалить
+        if (currentIndex < history.Count - 1)
+        {
+            history.RemoveRange(currentIndex + 1, history.Count - (currentIndex + 1));
+        }
+
+        // Добавляем новое состояние в историю
+        string currentLog = currentIndex >= 0 ? history[currentIndex].OperationLog : "";
+        history.Add(new CalculatorMemento(currentValue, currentLog));
+        currentIndex++;
+    }
+
+    // Вспомогательный метод для обновления лога операций
+    private void UpdateOperationLog(string operationDescription)
+    {
+        if (currentIndex >= 0 && currentIndex < history.Count)
+        {
+            var currentMemento = history[currentIndex];
+            history[currentIndex] = new CalculatorMemento(
+                currentMemento.Value,
+                currentMemento.OperationLog + operationDescription
+            );
+        }
+    }
+
+    // Сложение
+    public void Add(double num)
+    {
+        SaveState();
+        currentValue += num;
+        UpdateOperationLog($" + {num}");
+    }
+
+    // Вычитание
+    public void Subtract(double num)
+    {
+        SaveState();
+        currentValue -= num;
+        UpdateOperationLog($" - {num}");
+    }
+
+    // Умножение
+    public void Multiply(double num)
+    {
+        SaveState();
+        currentValue *= num;
+        UpdateOperationLog($" * {num}");
+    }
+
+    // Деление (с проверкой на ноль)
+    public void Divide(double num)
+    {
+        if (num == 0)
+        {
+            Console.WriteLine("Ошибка: деление на ноль!");
+            return;
+        }
+        SaveState();
+        currentValue /= num;
+        UpdateOperationLog($" / {num}");
+    }
+
+    // Возведение в степень
+    public void Power(double exponent)
+    {
+        SaveState();
+        currentValue = Math.Pow(currentValue, exponent);
+        UpdateOperationLog($" ^ {exponent}");
+    }
+
+    // Извлечение квадратного корня (с проверкой на отрицательное число)
+    public void SquareRoot()
+    {
+        if (currentValue < 0)
+        {
+            Console.WriteLine("Ошибка: нельзя извлечь квадратный корень из отрицательного числа!");
+            return;
+        }
+        SaveState();
+        currentValue = Math.Sqrt(currentValue);
+        UpdateOperationLog(" √");
+    }
+
+    // Отмена последнего действия (undo)
+    public void Undo()
+    {
+        if (currentIndex > 0)
+        {
+            currentIndex--;
+            currentValue = history[currentIndex].Value;
+            Console.WriteLine($"Отменено. Текущее значение: {currentValue}");
+        }
+        else
+        {
+            Console.WriteLine("Нельзя отменить: это первое состояние.");
+        }
+    }
+
+    // Повтор отменённого действия (redo)
+    public void Redo()
+    {
+        if (currentIndex < history.Count - 1)
+        {
+            currentIndex++;
+            currentValue = history[currentIndex].Value;
+            Console.WriteLine($"Повторено. Текущее значение: {currentValue}");
+        }
+        else
+        {
+            Console.WriteLine("Нельзя повторить: нет отменённых действий.");
+        }
+    }
+
+    // Очистка истории вычислений (сброс калькулятора)
+    public void ClearHistory()
+    {
+        history.Clear();
+        currentIndex = -1;
+        currentValue = 0;
+        SaveState();
+        Console.WriteLine("История очищена. Текущее значение сброшено до 0.");
+    }
+
+    // Показать цепочку операций (цепочку выполненных действий)
+    public void ShowOperationChain()
+    {
+        if (currentIndex >= 0)
+        {
+            string log = history[currentIndex].OperationLog;
+            Console.WriteLine("Цепочка операций: " + (string.IsNullOrEmpty(log) ? "нет операций" : log.TrimStart(' ')));
+        }
+        else
+        {
+            Console.WriteLine("Нет данных о цепочке операций.");
+        }
+    }
+
+    // Получить текущее значение калькулятора
+    public double GetCurrentValue()
+    {
+        return currentValue;
+    }
+}
+
+class Program
+{
+    static void Main(string[] args)
+    {
+        Calculator calc = new Calculator();
+        bool exit = false;
+
+        Console.WriteLine("Добро пожаловать в калькулятор!");
+        Console.WriteLine("Доступные команды:");
+        Console.WriteLine("  + <число> — сложение");
+        Console.WriteLine("  - <число> — вычитание");
+        Console.WriteLine("  * <число> — умножение");
+        Console.WriteLine("  / <число> — деление");
+        Console.WriteLine("  ^ <число> — возведение в степень");
+        Console.WriteLine("  √ — квадратный корень");
+        Console.WriteLine("  u — отменить последнее действие (undo)");
+        Console.WriteLine("  r — повторить отменённое действие (redo)");
+        Console.WriteLine("  c — очистить историю и сбросить значение");
+        Console.WriteLine("  h — показать цепочку операций");
+        Console.WriteLine("  q — выход");
+
+        while (!exit)
+        {
+            Console.Write($"\nТекущее значение: {calc.GetCurrentValue()}\nВведите команду: ");
+            string input = Console.ReadLine();
+
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                continue;
+            }
+
+            char command = input[0];
+            string numberPart = input.Length > 1 ? input.Substring(1).Trim() : "";
+
+            double number;
+            bool hasNumber = double.TryParse(numberPart, out number);
+
+            switch (command)
+            {
+                case '+':
+                    if (hasNumber)
+                    {
+                        calc.Add(number);
+                        Console.WriteLine($"Результат: {calc.GetCurrentValue()}");
+                    }
+                    else
+                    {
+                        Console.WriteLine("Ошибка: укажите число после +");
+                    }
+                    break;
+                case '-':
+                    if (hasNumber)
+                    {
+                        calc.Subtract(number);
+                        Console.WriteLine($"Результат: {calc.GetCurrentValue()}");
+                    }
+                    else
+                    {
+                        Console.WriteLine("Ошибка: укажите число после -");
+                    }
+                    break;
+                case '*':
+                    if (hasNumber)
+                    {
+                        calc.Multiply(number);
+                        Console.WriteLine($"Результат: {calc.GetCurrentValue()}");
+                    }
+                    else
+                    {
+                        Console.WriteLine("Ошибка: укажите число после *");
+                    }
+                    break;
+                case '/':
+                    if (hasNumber)
+                    {
+                        calc.Divide(number);
+                        Console.WriteLine($"Результат: {calc.GetCurrentValue()}");
+                    }
+                    else
+                    {
+                        Console.WriteLine("Ошибка: укажите число после /");
+                    }
+                    break;
+                case '^':
+                    if (hasNumber)
+                    {
+                        calc.Power(number);
+                        Console.WriteLine($"Результат: {calc.GetCurrentValue()}");
+                    }
+                    else
+                    {
+                        Console.WriteLine("Ошибка: укажите показатель степени после ^");
+                    }
+                    break;
+                case '√':
+                    calc.SquareRoot();
+                    Console.WriteLine($"Результат: {calc.GetCurrentValue()}");
+                    break;
+                case 'u':
+                    calc.Undo();
+                    break;
+                    case 'r':
+                    calc.Redo();
+                    break;
+                case 'c':
+                    calc.ClearHistory();
+                    Console.WriteLine($"Текущее значение: {calc.GetCurrentValue()}");
+                    break;
+                case 'h':
+                    calc.ShowOperationChain();
+                    break;
+                case 'q':
+                    exit = true;
+                    Console.WriteLine("Выход из калькулятора.");
+                    break;
+                default:
+                    Console.WriteLine("Неизвестная команда. Используйте h для справки.");
+                    break;
+            }
+        }
+    }
+}
